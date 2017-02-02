@@ -7,12 +7,18 @@ import tensorflow as tf
 
 import argparse
 import logging
+import os.path
+import shutil
 
 from policy import QLearningPolicy
 from prior import FixedUniformDiscretePrior
 from q_approx import LinearQApproximation
 
 logger = logging.getLogger("mylogger")  # regular logging clashes with gym
+hdlr = logging.FileHandler('gridworld.log')
+hdlr.setFormatter(logging.Formatter('D: %(message)s'))
+logger.addHandler(hdlr)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--log", dest="log", action="store_const",
                     const=True, default=False, help="turn on logging")
@@ -21,7 +27,7 @@ if args.log:
     logger.setLevel(logging.DEBUG)
 
 n_options = 10
-n_episodes = 10000
+n_episodes = 1000
 env = gym.make("grid-world-v0")
 n_actions = env.action_space.n
 n_states = reduce(lambda x,y: x*y,
@@ -42,10 +48,7 @@ sess.run(tf.global_variables_initializer())
 if __name__ == "__main__":
     logger.debug("n_actions: %d, n_states %d" % (n_actions, n_states))
     for episode in xrange(n_episodes):
-        if episode % 1000 == 32:
-            print("ep:", episode)
-        if episode == 9900:
-            logger.setLevel(logging.DEBUG)
+        env.reset()
         logger.debug("episode %d" % episode)
         logger.debug("==========")
         policy.epsilon = 1.0 - (float(episode) / float(n_episodes))
@@ -55,20 +58,20 @@ if __name__ == "__main__":
         omega, p_omega = prior.sample_omega()
         policy.set_omega(omega)
         while not policy.is_terminal(action):
-            logger.debug("omega: %d" % policy.omega)
             logger.debug("state: %s, state_hash: %d" %
                          (env.state, state_hash(env.state)))
             states_hist.append(state_hash(env.state))
 
             action = policy.get_action(state_hash(env.state))
             logger.debug("action: %d" % action)
-            logger.debug("is terminal: %s" % policy.is_terminal(action))
+            env.step(action)
             actions_hist.append(action)
         
         logger.debug("sf: %s" % env.state)
-        q_omega = q_approx.regress(omega, state_hash(env.state))
+        q_omega, loss = q_approx.regress(omega, state_hash(env.state))
         logger.debug("q(omega|sf) = %f" % q_omega)
         logger.debug("p(omega|s0) = %f" % p_omega)
+        logger.debug("q loss = %f" % loss)
 
         rewards = [math.log(q_omega) - math.log(p_omega)] * len(actions_hist)
         logger.debug("reward: %f" % rewards[0])

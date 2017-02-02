@@ -2,7 +2,7 @@ import tensorflow as tf
 
 class LinearQApproximation:
     def __init__(self, n_states, n_options, sess, use_s0=False,
-                 opt=tf.train.AdamOptimizer()):
+                 opt=tf.train.AdamOptimizer(0.001)):
         self.n_states = n_states
         self.n_options = n_options
         self.sess = sess
@@ -46,9 +46,15 @@ class LinearQApproximation:
                      self.omega_place: omega}
         if s0 is not None:
             feed_dict[self.s0_place] = s0
-            
-        q_omega, _ = self.sess.run([self.normalized_output[0], self.train_op],
-                                   feed_dict=feed_dict)
+         
+        q_loss, q_omega, _ = self.sess.run([self.loss,
+                                            self.normalized_output[0],
+                                            self.train_op],
+                                           feed_dict=feed_dict)
+
+        for _ in xrange(9):
+            self.sess.run(self.train_op, feed_dict=feed_dict)
+
         
-        return q_omega[omega]
+        return q_omega[omega], q_loss
 

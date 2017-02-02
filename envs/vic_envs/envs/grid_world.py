@@ -12,7 +12,7 @@ class GridWorld(gym.Env):
         self._seed()
 
         self._reset()
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.Discrete(len(ACTION_MEANING))
         self.observation_space = spaces.Tuple(
             (spaces.Discrete(board_size[0]), spaces.Discrete(board_size[1])))
 
@@ -30,6 +30,7 @@ class GridWorld(gym.Env):
             self._move(action)
 
         return self.state, 0, False, {}
+    # TODO: distinguish between the two noop actions (finish the environment)
 
     def _move(self, direction):
         movement = ACTION_MEANING[direction]
@@ -50,17 +51,19 @@ class GridWorld(gym.Env):
         pass
 
 ACTION_NAME = {
-    0 : "NOOP",
-    1 : "UP",
-    2 : "DOWN",
-    3 : "RIGHT",
-    4 : "LEFT",
+    0 : "NOOP, finish the option",
+    1 : "NOOP",
+    2 : "UP",
+    3 : "DOWN",
+    4 : "RIGHT",
+    5 : "LEFT",
 }
 
 ACTION_MEANING = {
     0: [0, 0],
-    1: [-1, 0],
-    2: [1, 0],
-    3: [0, 1],
-    4: [0, -1],
+    1: [0, 0],
+    2: [-1, 0],
+    3: [1, 0],
+    4: [0, 1],
+    5: [0, -1],
 }
