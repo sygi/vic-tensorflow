@@ -1,4 +1,6 @@
 import gym
+import pyglet
+
 from gym import error, spaces, utils
 from gym.utils import seeding
 
@@ -6,7 +8,7 @@ from gym.utils import seeding
 class GridWorld(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, board_size=(9, 5), wind_proba=0.2):
+    def __init__(self, board_size=(5, 9), wind_proba=0.2):
         self.board_size = board_size
         self.wind_proba = wind_proba
         self._seed()
@@ -15,6 +17,7 @@ class GridWorld(gym.Env):
         self.action_space = spaces.Discrete(len(ACTION_MEANING))
         self.observation_space = spaces.Tuple(
             (spaces.Discrete(board_size[0]), spaces.Discrete(board_size[1])))
+        self.window = None
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -29,8 +32,7 @@ class GridWorld(gym.Env):
         else:
             self._move(action)
 
-        return self.state, 0, False, {}
-    # TODO: distinguish between the two noop actions (finish the environment)
+        return self.state, 0, ACTION_MEANING[action] == "FINISH", {}
 
     def _move(self, direction):
         movement = ACTION_MEANING[direction]
@@ -48,10 +50,58 @@ class GridWorld(gym.Env):
         return self.state
 
     def _render(self, mode='human', close=False):
-        pass
+        self.unit = 30
+        if close:
+            if self.window is not None:
+                self.window.close()
+            return
+
+        if self.window is None:
+            self.window = pyglet.window.Window(height=(self.board_size[1] *
+                                                       self.unit),
+                                               width=(self.board_size[0] *
+                                                      self.unit))
+        self.window.dispatch_events()
+
+        for x in xrange(self.board_size[0]):
+            for y in xrange(self.board_size[1]):
+                self._draw_field(x, y)
+
+        self._draw_agent(*self.state)
+        self.window.flip()
+ 
+    def _draw_field(self, x, y):
+        if (x + y) % 2 == 0:
+            color = ('c3B', (224, 224, 224) * 4)  # light gray
+        else:
+            color = ('c3B', (160, 160, 160) * 4)  # gray
+
+        vertex_list = ([(x_it * self.unit, y * self.unit)
+                        for x_it in xrange(x, x+2)] +
+                       [(x_it * self.unit, (y+1) * self.unit)
+                        for x_it in xrange(x+1, x-1, -1)])
+
+        vertex_flat = [coord for vert in vertex_list for coord in vert]
+
+        pyglet.graphics.draw(4, pyglet.gl.GL_QUADS, ('v2f', vertex_flat),
+                             color)
+
+    def _draw_agent(self, x_agent, y_agent):
+        xs = [self.unit/4, (3*self.unit)/4, self.unit/2]
+        ys = [self.unit/5, self.unit/5, (4*self.unit)/5]
+
+        vertex_moved = zip([x_agent * self.unit + x for x in xs],
+                           [y_agent * self.unit + y for y in ys])
+
+        vertex_flat = [coord for vert in vertex_moved for coord in vert]
+
+        color = ('c3B', (255, 153, 51) * 3)
+        pyglet.graphics.draw(3, pyglet.gl.GL_TRIANGLES, ('v2f', vertex_flat),
+                             color)
+
 
 ACTION_NAME = {
-    0 : "NOOP, finish the option",
+    0 : "FINISH",
     1 : "NOOP",
     2 : "UP",
     3 : "DOWN",
