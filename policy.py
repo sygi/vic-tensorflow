@@ -13,7 +13,9 @@ class QLearningPolicy:
         self.terminate_prob = terminate_prob
         self.discount = discount
         self.learning_rate = learning_rate
-        self.epsilon = epsilon
+        self._epsilon = epsilon
+
+        self.min_epsilon = 0.1
 
         self.q_value = np.random.random([n_options, n_states, n_actions])/1.e6
 
@@ -32,6 +34,13 @@ class QLearningPolicy:
         """Assumes states are hashed (ints between 0 and n_states)."""
         for (p_s, a, r, n_s) in zip(states, actions, rewards, states[1:]):
             self.process_transition(p_s, a, r, n_s)
+
+        # last action
+        self.q_value[self.omega, states[-1], actions[-1]] =\
+            ((1 - self.learning_rate) * self.q_value[self.omega,
+                                                     states[-1],
+                                                     actions[-1]] + 
+             self.learning_rate * rewards[-1])
     
     def get_action(self, state):
         """Assumes state is hashed (an int between 0 and n_states)."""
@@ -49,3 +58,11 @@ class QLearningPolicy:
 
     def set_omega(self, omega):
         self.omega = omega
+    
+    @property
+    def epsilon(self):
+        return self._epsilon
+
+    @epsilon.setter
+    def epsilon(self, value):
+        self._epsilon = max(value, self.min_epsilon)

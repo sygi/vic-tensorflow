@@ -49,7 +49,7 @@ class GridWorld(gym.Env):
         self.state = [self.board_size[0]/2, self.board_size[1]/2]
         return self.state
 
-    def _render(self, mode='human', close=False):
+    def _render(self, mode='human', close=False, agent_color="ORANGE"):
         self.unit = 30
         if close:
             if self.window is not None:
@@ -67,7 +67,7 @@ class GridWorld(gym.Env):
             for y in xrange(self.board_size[1]):
                 self._draw_field(x, y)
 
-        self._draw_agent(*self.state)
+        self._draw_agent(*self.state, color=agent_color)
         self.window.flip()
  
     def _draw_field(self, x, y):
@@ -86,7 +86,7 @@ class GridWorld(gym.Env):
         pyglet.graphics.draw(4, pyglet.gl.GL_QUADS, ('v2f', vertex_flat),
                              color)
 
-    def _draw_agent(self, x_agent, y_agent):
+    def _draw_agent(self, x_agent, y_agent, color="ORANGE"):
         xs = [self.unit/4, (3*self.unit)/4, self.unit/2]
         ys = [self.unit/5, self.unit/5, (4*self.unit)/5]
 
@@ -95,9 +95,14 @@ class GridWorld(gym.Env):
 
         vertex_flat = [coord for vert in vertex_moved for coord in vert]
 
-        color = ('c3B', (255, 153, 51) * 3)
+        if color == "ORANGE":
+            color_vert = ('c3B', (255, 153, 51) * 3)
+        elif color == "BLUE":
+            color_vert = ('c3B', (51, 153, 255) * 3)
+        else:
+            raise NotImplementedError
         pyglet.graphics.draw(3, pyglet.gl.GL_TRIANGLES, ('v2f', vertex_flat),
-                             color)
+                             color_vert)
 
 
 ACTION_NAME = {
