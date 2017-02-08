@@ -2,7 +2,7 @@ import tensorflow as tf
 
 class LinearQApproximation:
     def __init__(self, n_states, n_options, sess, use_s0=False,
-                 opt=tf.train.AdamOptimizer(0.001)):
+                 opt=tf.train.AdamOptimizer(0.0001)):
         self.n_states = n_states
         self.n_options = n_options
         self.sess = sess
@@ -40,21 +40,29 @@ class LinearQApproximation:
         self.normalized_output = tf.nn.softmax(self.output)
         self.train_op = self.opt.minimize(self.loss)
 
-
-    def regress(self, omega, sf, s0=None):
+    def _get_feed_dict(self, omega, sf, s0=None):
         feed_dict = {self.sf_place: sf,
                      self.omega_place: omega}
         if s0 is not None:
             feed_dict[self.s0_place] = s0
-         
+        return feed_dict
+
+
+    def regress(self, omega, sf, s0=None):
+        feed_dict = self._get_feed_dict(omega, sf, s0)
         q_loss, q_omega, _ = self.sess.run([self.loss,
                                             self.normalized_output[0],
                                             self.train_op],
                                            feed_dict=feed_dict)
 
-        for _ in xrange(9):
+        for _ in xrange(99):
             self.sess.run(self.train_op, feed_dict=feed_dict)
 
-        
         return q_omega[omega], q_loss
 
+    def q_value(self, omega, sf, s0=None):
+        feed_dict = self._get_feed_dict(omega, sf, s0)
+        q_omega = self.sess.run(self.normalized_output[0][omega],
+                                feed_dict=feed_dict)
+
+        return q_omega

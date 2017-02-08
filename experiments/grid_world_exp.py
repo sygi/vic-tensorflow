@@ -55,26 +55,16 @@ class GridWorldExperiment():
 
     def train(self, n_episodes=1000):
         for episode in xrange(n_episodes):
-            self.env.reset()
             self.logger.debug("episode %d", episode)
             self.logger.debug("==========")
             self.policy.epsilon = 1.0 - (float(episode) / float(n_episodes))
+
             action = -1
             states_hist = []
             actions_hist = []
             omega, p_omega = self.prior.sample_omega()
-            self.policy.set_omega(omega)
-            while not self.policy.is_terminal(action):
-                self.logger.debug("state: %s, state_hash: %d", self.env.state,
-                                  self.state_hash(self.env.state))
-                states_hist.append(self.state_hash(self.env.state))
-                # TODO: use state from the env.step
+            states_hist, actions_hist = self.rollout(omega)
 
-                action = self.policy.get_action(self.state_hash(self.env.state))
-                self.logger.debug("action: %d", action)
-                self.env.step(action)
-                actions_hist.append(action)
-            
             self.logger.debug("sf: %s", self.env.state)
             q_omega, loss = self.q_approx.regress(omega,
                                                   self.state_hash(self.env.state))
@@ -89,6 +79,31 @@ class GridWorldExperiment():
             self.logger.debug("policy updated")
 
 
+    def rollout(self, omega, render=False):
+        self.env.reset()
+        action = -1
+        states_hist = []
+        actions_hist = []
+        self.policy.set_omega(omega)
+        while not self.policy.is_terminal(action):
+            if render:
+                self.env._render()
+                time.sleep(0.01)
+            self.logger.debug("state: %s, state_hash: %d", self.env.state,
+                              self.state_hash(self.env.state))
+            states_hist.append(self.state_hash(self.env.state))
+            # TODO: use state from the env.step
+
+            action = self.policy.get_action(self.state_hash(self.env.state))
+            self.logger.debug("action: %d", action)
+            self.env.step(action)
+            actions_hist.append(action)
+
+        if render:
+            self.env._render(agent_color="BLUE")
+            time.sleep(1.)
+
+        return states_hist, actions_hist
 
 if __name__ == "__main__":
     logger = logging.getLogger("mylogger")  # regular logging clashes with gym
@@ -108,5 +123,20 @@ if __name__ == "__main__":
     experiment = GridWorldExperiment(logger=logger)
     logger.info("starting training")
 
-    experiment.train()
-    logger.info("finished training")
+    experiment.train(n_episodes=10000)
+    logger.info("finished training, starting eval")
+
+    samples = 100
+    for omega in xrange(experiment.n_options):
+        reward_sum = 0.
+        for _ in xrange(samples):
+            experiment.rollout(omega)
+            q_omega = experiment.q_approx.q_value(omega, experiment.state_hash(
+                experiment.env.state))
+            p_omega = experiment.prior.p_omega(omega)
+
+            reward_sum += math.log(q_omega) - math.log(p_omega)
+
+        average_reward = reward_sum / samples
+        logger.info("omega %d average reward %f (log %f)", omega,
+                    average_reward, math.exp(average_reward))
