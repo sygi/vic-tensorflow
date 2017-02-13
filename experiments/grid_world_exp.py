@@ -55,8 +55,12 @@ class GridWorldExperiment():
 
     def train(self, n_episodes=1000):
         for episode in xrange(n_episodes):
-            self.logger.debug("episode %d", episode)
-            self.logger.debug("==========")
+            if episode % 1000 == 999:
+                self.logger.info("episode %d", episode)
+                self.logger.info("==========")
+            else:
+                self.logger.debug("episode %d", episode)
+                self.logger.debug("==========")
             self.policy.epsilon = 1.0 - (float(episode) / float(n_episodes))
 
             action = -1
@@ -66,14 +70,16 @@ class GridWorldExperiment():
             states_hist, actions_hist = self.rollout(omega)
 
             self.logger.debug("sf: %s", self.env.state)
-            q_omega, loss = self.q_approx.regress(omega,
-                                                  self.state_hash(self.env.state))
+
+            q_omega = self.q_approx.q_value(omega,
+                                            self.state_hash(self.env.state))
             self.logger.debug("q(omega|sf) = %f", q_omega)
             self.logger.debug("p(omega|s0) = %f", p_omega)
-            self.logger.debug("q loss = %f", loss)
 
             rewards = [math.log(q_omega) - math.log(p_omega)] * len(actions_hist)
             self.logger.debug("reward: %f", rewards[0])
+            
+            self.q_approx.regress(omega, self.state_hash(self.env.state))
 
             self.policy.process_trajectory(states_hist, actions_hist, rewards)
             self.logger.debug("policy updated")
@@ -123,7 +129,7 @@ if __name__ == "__main__":
     experiment = GridWorldExperiment(logger=logger)
     logger.info("starting training")
 
-    experiment.train(n_episodes=10000)
+    experiment.train(n_episodes=5000)
     logger.info("finished training, starting eval")
 
     samples = 100
