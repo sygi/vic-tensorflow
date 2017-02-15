@@ -2,7 +2,7 @@ import tensorflow as tf
 
 class LinearQApproximation:
     def __init__(self, n_states, n_options, sess, use_s0=False,
-                 opt=tf.train.AdamOptimizer(0.0001)):
+                 opt=tf.train.AdamOptimizer(0.00005)):
         self.n_states = n_states
         self.n_options = n_options
         self.sess = sess
@@ -14,7 +14,7 @@ class LinearQApproximation:
         # only increasing, the next place to write to will be
         # self.replay_it % self.history_size
 
-        self.batch_size = 16
+        self.batch_size = 32
         
         self.build(use_s0)
         
@@ -91,12 +91,9 @@ class LinearQApproximation:
         self.sess.run(self.inc_replay_it, feed_dict=feed_dict)
 
         # train on replay memory
-        q_loss, q_omega, _ = self.sess.run([self.loss,
-                                            self.predictions,
-                                            self.train_op],
-                                           feed_dict=feed_dict)
+        for _ in xrange(20):
+            self.sess.run(self.train_op, feed_dict=feed_dict)
 
-        return q_omega, q_loss
 
     def q_value(self, omega, sf, s0=None):
         feed_dict = self._get_feed_dict(omega, sf, s0)

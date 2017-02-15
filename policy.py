@@ -2,10 +2,10 @@ import tensorflow as tf
 import numpy as np
 
 # TODO: maybe better change it to tensorflow?
-class QLearningPolicy:
+class QLearningPolicy(object):
     def __init__(self, n_states, n_actions, n_options, state_hash=id,
                  terminate_prob=0.05, learning_rate=0.1, discount=0.9,
-                 epsilon=0.05):
+                 epsilon=0.1):
 
         self.n_states = n_states
         self.n_actions = n_actions  # assume action no 0 is "finish"
@@ -15,7 +15,7 @@ class QLearningPolicy:
         self.learning_rate = learning_rate
         self._epsilon = epsilon
 
-        self.min_epsilon = 0.1
+        self.min_epsilon = 0.05
 
         self.q_value = np.random.random([n_options, n_states, n_actions])/1.e6
 
