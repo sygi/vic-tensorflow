@@ -61,12 +61,13 @@ class GridWorldExperiment():
             else:
                 self.logger.debug("episode %d", episode)
                 self.logger.debug("==========")
-            self.policy.epsilon = 1.0 - (float(episode) / float(n_episodes))
+            self.policy.epsilon = 0.1 + 0.9 - (float(episode) / float(n_episodes))
 
             action = -1
             states_hist = []
             actions_hist = []
             omega, p_omega = self.prior.sample_omega()
+            self.logger.debug("omega: %d", omega)
             states_hist, actions_hist = self.rollout(omega)
 
             self.logger.debug("sf: %s", self.env.state)
@@ -120,6 +121,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", dest="log", action="store_const",
                         const=True, default=False, help="turn on logging")
+    parser.add_argument('--no-roll', dest="no_roll", action="store_const",
+                        const=True, default=False,
+                        help="disable rollout after training")
     args = parser.parse_args()
     if args.log:
         logger.setLevel(logging.DEBUG)
@@ -129,20 +133,21 @@ if __name__ == "__main__":
     experiment = GridWorldExperiment(logger=logger)
     logger.info("starting training")
 
-    experiment.train(n_episodes=5000)
+    experiment.train(n_episodes=2000)
     logger.info("finished training, starting eval")
 
-    samples = 100
-    for omega in xrange(experiment.n_options):
-        reward_sum = 0.
-        for _ in xrange(samples):
-            experiment.rollout(omega)
-            q_omega = experiment.q_approx.q_value(omega, experiment.state_hash(
-                experiment.env.state))
-            p_omega = experiment.prior.p_omega(omega)
+    if not args.no_roll:
+        samples = 100
+        for omega in xrange(experiment.n_options):
+            reward_sum = 0.
+            for _ in xrange(samples):
+                experiment.rollout(omega)
+                q_omega = experiment.q_approx.q_value(
+                    omega, experiment.state_hash(experiment.env.state))
+                p_omega = experiment.prior.p_omega(omega)
 
-            reward_sum += math.log(q_omega) - math.log(p_omega)
+                reward_sum += math.log(q_omega) - math.log(p_omega)
 
-        average_reward = reward_sum / samples
-        logger.info("omega %d average reward %f (log %f)", omega,
-                    average_reward, math.exp(average_reward))
+            average_reward = reward_sum / samples
+            logger.info("omega %d average reward %f (log %f)", omega,
+                        average_reward, math.exp(average_reward))

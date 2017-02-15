@@ -42,9 +42,10 @@ class LinearQApproximation:
 
         # extending replay memory
         self.obs_place = tf.placeholder(tf.int32, shape=[2])
-        self.assign_op = self.experience_history[
+        assign_op = self.experience_history[
             self.replay_it % self.history_size].assign(self.obs_place)
-        self.inc_replay_it = self.replay_it.assign_add(1)
+        with tf.control_dependencies([assign_op]):
+            self.inc_replay_it = self.replay_it.assign_add(1)
 
         # training part
         # TODO: handle s0
@@ -56,7 +57,9 @@ class LinearQApproximation:
 
         observations = tf.gather(self.experience_history, indices)
         omegas = observations[:, 0]
-        final_states = tf.one_hot(observations[:, 1], depth=self.n_states)
+        final_states = tf.one_hot(observations[:, 1], depth=self.n_states)  # batch_size x n_states
+        
+        assert final_states.get_shape() == (self.batch_size, self.n_states)
 
         current_output = tf.matmul(final_states, W) + b
 
@@ -85,7 +88,7 @@ class LinearQApproximation:
         feed_dict = self._get_feed_dict(omega, sf, s0)
         
         # add to replay memory
-        self.sess.run([self.assign_op, self.inc_replay_it], feed_dict=feed_dict)
+        self.sess.run(self.inc_replay_it, feed_dict=feed_dict)
 
         # train on replay memory
         q_loss, q_omega, _ = self.sess.run([self.loss,
