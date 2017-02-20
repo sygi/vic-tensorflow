@@ -7,7 +7,7 @@ class LinearQApproximation:
         self.n_options = n_options
         self.sess = sess
         self.opt = opt
-        self.history_size = 1000
+        self.history_size = 100
         self.experience_history = tf.Variable([[0, 0]] * self.history_size)
         # (option, state)
         self.replay_it = tf.Variable(0)
@@ -57,7 +57,7 @@ class LinearQApproximation:
 
         observations = tf.gather(self.experience_history, indices)
         omegas = observations[:, 0]
-        final_states = tf.one_hot(observations[:, 1], depth=self.n_states)  # batch_size x n_states
+        final_states = tf.one_hot(observations[:, 1], depth=self.n_states)
         
         assert final_states.get_shape() == (self.batch_size, self.n_states)
 
@@ -83,16 +83,14 @@ class LinearQApproximation:
             feed_dict[self.s0_place] = s0
         return feed_dict
 
-
-    def regress(self, omega, sf, s0=None):
+    
+    def add_to_memory(self, omega, sf, s0=None):
         feed_dict = self._get_feed_dict(omega, sf, s0)
-        
-        # add to replay memory
         self.sess.run(self.inc_replay_it, feed_dict=feed_dict)
 
-        # train on replay memory
-        for _ in xrange(20):
-            self.sess.run(self.train_op, feed_dict=feed_dict)
+    def regress(self):
+        for _ in xrange(100):
+            self.sess.run(self.train_op)
 
 
     def q_value(self, omega, sf, s0=None):

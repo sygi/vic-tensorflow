@@ -9,10 +9,12 @@ import argparse
 import logging
 import os.path
 import shutil
+import time
 
 from policy import QLearningPolicy
 from prior import FixedUniformDiscretePrior
 from q_approx import LinearQApproximation
+from tools import Trajectory
 
 class GridWorldExperiment():
     def __init__(self, n_options=10, logger=None,
@@ -38,8 +40,9 @@ class GridWorldExperiment():
 
         self.state_hash = lambda x: x[1] * state_first_dim + x[0]
 
-        self.policy = QLearningPolicy(self.n_states, self.n_actions,
-                                      self.n_options, state_hash=self.state_hash)
+        self.policy = QLearningPolicy(self.n_states, self.n_actions-1,
+                                      self.n_options, self.sess,
+                                      state_hash=self.state_hash)
         self.q_approx = LinearQApproximation(self.n_states, self.n_options,
                                              self.sess)
 
@@ -54,6 +57,7 @@ class GridWorldExperiment():
         self.sess.run(tf.global_variables_initializer())
 
     def train(self, n_episodes=1000):
+        trajectories = []
         for episode in xrange(n_episodes):
             if episode % 1000 == 999:
                 self.logger.info("episode %d", episode)
@@ -61,7 +65,7 @@ class GridWorldExperiment():
             else:
                 self.logger.debug("episode %d", episode)
                 self.logger.debug("==========")
-            self.policy.epsilon = 0.1 + 0.9 - (float(episode) / float(n_episodes))
+            #self.policy.epsilon = 1.0 - (float(episode) / float(n_episodes))
 
             action = -1
             states_hist = []
@@ -82,7 +86,9 @@ class GridWorldExperiment():
             
             self.q_approx.regress(omega, self.state_hash(self.env.state))
 
-            self.policy.process_trajectory(states_hist, actions_hist, rewards)
+            self.logger.debug("q regressed")
+            self.policy.process_trajectory(states_hist, actions_hist, rewards,
+                                           omega)
             self.logger.debug("policy updated")
 
 
@@ -91,7 +97,6 @@ class GridWorldExperiment():
         action = -1
         states_hist = []
         actions_hist = []
-        self.policy.set_omega(omega)
         while not self.policy.is_terminal(action):
             if render:
                 self.env._render()
@@ -101,7 +106,8 @@ class GridWorldExperiment():
             states_hist.append(self.state_hash(self.env.state))
             # TODO: use state from the env.step
 
-            action = self.policy.get_action(self.state_hash(self.env.state))
+            action = self.policy.get_action(self.state_hash(self.env.state),
+                                            omega)
             self.logger.debug("action: %d", action)
             self.env.step(action)
             actions_hist.append(action)
@@ -137,14 +143,16 @@ if __name__ == "__main__":
     logger.info("finished training, starting eval")
 
     if not args.no_roll:
-        samples = 100
+        samples = 10
         for omega in xrange(experiment.n_options):
+            logger.info("omega %d", omega)
             reward_sum = 0.
             for _ in xrange(samples):
                 experiment.rollout(omega)
                 q_omega = experiment.q_approx.q_value(
                     omega, experiment.state_hash(experiment.env.state))
                 p_omega = experiment.prior.p_omega(omega)
+                logger.info("final state %s", experiment.env.state)
 
                 reward_sum += math.log(q_omega) - math.log(p_omega)
 
