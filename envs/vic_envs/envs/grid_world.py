@@ -108,10 +108,10 @@ class GridWorld(gym.Env):
 ACTION_NAME = {
     0 : "FINISH",
     1 : "NOOP",
-    2 : "UP",
-    3 : "DOWN",
-    4 : "RIGHT",
-    5 : "LEFT",
+    2 : "LEFT",
+    3 : "RIGHT",
+    4 : "UP",
+    5 : "DOWN",
 }
 
 ACTION_MEANING = {

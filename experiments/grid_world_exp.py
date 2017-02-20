@@ -72,6 +72,7 @@ class GridWorldExperiment():
             actions_hist = []
             omega, p_omega = self.prior.sample_omega()
             self.logger.debug("omega: %d", omega)
+            self.logger.debug("epsilon: %f", self.policy.epsilon)
             states_hist, actions_hist = self.rollout(omega)
 
             self.logger.debug("sf: %s", self.env.state)
@@ -84,12 +85,27 @@ class GridWorldExperiment():
             rewards = [math.log(q_omega) - math.log(p_omega)] * len(actions_hist)
             self.logger.debug("reward: %f", rewards[0])
             
-            self.q_approx.regress(omega, self.state_hash(self.env.state))
 
-            self.logger.debug("q regressed")
-            self.policy.process_trajectory(states_hist, actions_hist, rewards,
-                                           omega)
-            self.logger.debug("policy updated")
+            if episode % 32 > 16:
+                # updating q-approx
+                self.logger.debug("adding to q-memory")
+                self.q_approx.add_to_memory(omega,
+                                            self.state_hash(self.env.state))
+                if episode % 32 == 31:
+                    self.logger.debug("regressing q")
+                    self.q_approx.regress()
+            else:
+                # updating policy
+                self.logger.debug("saving trajectory")
+                trajectories.append(Trajectory(
+                    omega=omega, states=states_hist,
+                    actions=actions_hist, rewards=rewards))
+
+                if episode % 32 == 16:
+                    self.logger.debug("processing trajectories")
+                    self.policy.update_policy(trajectories)
+
+            # TODO: refactor
 
 
     def rollout(self, omega, render=False):

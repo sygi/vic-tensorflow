@@ -4,7 +4,7 @@ import numpy as np
 # TODO: maybe better change it to tensorflow?
 class QLearningPolicy(object):
     def __init__(self, n_states, n_actions, n_options, sess, state_hash=id,
-                 terminate_prob=0.05, opt=tf.train.AdamOptimizer(0.0001),
+                 terminate_prob=0.05, opt=tf.train.AdamOptimizer(0.0002),
                  discount=0.9, epsilon=0.0):
 
         self.n_states = n_states
@@ -69,8 +69,9 @@ class QLearningPolicy(object):
             self.process_transition(p_s, a, r, n_s, omega)
 
     def update_policy(self, trajectories):
-        for t in trajectories:
-            self.process_trajectory(t.states, t.actions, t.rewards, t.omega)
+        for _ in xrange(10):
+            for t in trajectories:
+                self.process_trajectory(t.states, t.actions, t.rewards, t.omega)
 
 
     def get_action(self, state, omega):
