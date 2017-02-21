@@ -4,6 +4,7 @@ import gym
 import vic_envs
 import math
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 import argparse
 import logging
@@ -14,7 +15,9 @@ import time
 from policy import QLearningPolicy
 from prior import FixedUniformDiscretePrior
 from q_approx import LinearQApproximation
-from tools import Trajectory
+from tools import Trajectory, PlotRobot
+
+plt.ion()
 
 class GridWorldExperiment():
     def __init__(self, n_options=10, logger=None,
@@ -31,6 +34,7 @@ class GridWorldExperiment():
                           map(lambda x: x.n, self.env.observation_space.spaces))
 
         self.build_graph(log_tf_graph)
+        self.plotting = None  #PlotRobot('rewards', 2)
 
     def build_graph(self, log_tf_graph):
         self.sess = tf.Session()
@@ -42,9 +46,12 @@ class GridWorldExperiment():
 
         self.policy = QLearningPolicy(self.n_states, self.n_actions-1,
                                       self.n_options, self.sess,
-                                      state_hash=self.state_hash)
+                                      state_hash=self.state_hash,
+                                      plotting=PlotRobot('dqn loss', 0,
+                                                         log_scale=True))
         self.q_approx = LinearQApproximation(self.n_states, self.n_options,
-                                             self.sess)
+                                             self.sess,
+                                             plotting=PlotRobot('q loss', 1))
 
         if log_tf_graph:
             logdir = "/data/lisatmp2/sygnowsj/tflogs/gridworld"
@@ -84,6 +91,8 @@ class GridWorldExperiment():
 
             rewards = [math.log(q_omega) - math.log(p_omega)] * len(actions_hist)
             self.logger.debug("reward: %f", rewards[0])
+            if self.plotting is not None:
+                self.plotting.add(rewards[0])
             
 
             if episode % 32 > 16:
