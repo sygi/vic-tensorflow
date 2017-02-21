@@ -6,7 +6,7 @@ from random import shuffle
 class QLearningPolicy(object):
     def __init__(self, n_states, n_actions, n_options, sess, state_hash=id,
                  plotting=None, terminate_prob=0.05,
-                 opt=tf.train.AdamOptimizer(0.0002), discount=0.95,
+                 opt=tf.train.AdamOptimizer(0.001), discount=0.95,
                  epsilon=0.0, batch_size=32):
 
         self.n_states = n_states
@@ -119,7 +119,7 @@ class QLearningPolicy(object):
                                         t.states[1:]):
                 transitions.append((p_s, a, r, n_s, t.omega))
 
-        for j in xrange(20):
+        for j in xrange(50):
             shuffle(transitions)
 
             for i in xrange(len(transitions)/self.batch_size):

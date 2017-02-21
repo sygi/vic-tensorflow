@@ -23,7 +23,7 @@ class PlotRobot():
         plt.figure(self.figure_id)
         if self.log_scale:
             plt.yscale('log')
-        plt.scatter(self.it, point, label=self.label)
+        plt.scatter(self.it, point, marker='.')
 
         plt.xlim(0, self.it - self.it%100 + 100)
         plt.legend([self.label])

@@ -2,7 +2,7 @@ import tensorflow as tf
 
 class LinearQApproximation:
     def __init__(self, n_states, n_options, sess, use_s0=False, plotting=None,
-                 opt=tf.train.AdamOptimizer(0.0002)):
+                 opt=tf.train.AdamOptimizer(0.001)):
         self.n_states = n_states
         self.n_options = n_options
         self.sess = sess
