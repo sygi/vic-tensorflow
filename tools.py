@@ -17,15 +17,18 @@ class PlotRobot():
         self.figure_id = figure_id
         self.log_scale = log_scale
 
-    def add(self, point):  
+    def add(self, point, color='b', marker='.', averages=False):
         self.points.append(point)  # TODO: refactor # TODO: some colors
         self.it += 1
         plt.figure(self.figure_id)
         if self.log_scale:
             plt.yscale('log')
-        plt.scatter(self.it, point, marker='.')
+        plt.scatter(self.it, point, marker=marker, color=color)
 
         plt.xlim(0, self.it - self.it%100 + 100)
-        plt.legend([self.label])
-#        plt.semilogy(self.points, figure=self.fig, label=self.label)
-        plt.pause(0.001)
+        if averages and self.it%200 == 0:
+            ave = sum(self.points[-200:])/len(self.points[-200:])
+            plt.plot([self.it - 200, self.it], [ave, ave], color='black')
+
+        plt.legend([self.label], loc='upper left')
+        plt.pause(0.0001)
