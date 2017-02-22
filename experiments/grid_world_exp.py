@@ -20,7 +20,7 @@ from tools import Trajectory, PlotRobot
 plt.ion()
 
 class GridWorldExperiment():
-    def __init__(self, n_options=10, logger=None,
+    def __init__(self, n_options=10, logger=None, plotting=False,
                  log_tf_graph=False):
         if logger is None:
             logger = logging.getLogger("logger")
@@ -28,13 +28,20 @@ class GridWorldExperiment():
         self.logger = logger
 
         self.n_options = n_options
-        self.env = gym.make("grid-world-v0")
+        self.env = gym.make("grid-world-simpler-v0")
         self.n_actions = self.env.action_space.n
-        self.n_states = reduce(lambda x,y: x*y,
-                          map(lambda x: x.n, self.env.observation_space.spaces))
+        self.n_states = 1 + reduce(lambda x,y: x*y,
+             map(lambda x: x.n, self.env.observation_space.spaces))
 
+        if plotting:
+            self.plot_robots = [PlotRobot('dqn loss', 0, log_scale=True),
+                                PlotRobot('q loss', 1), PlotRobot('rewards', 2)]
+        else:
+            self.plot_robots = [None] * 3
+        self.plotting = self.plot_robots[2]
+
+        self.colors = list('bgrcmyk') + ['magenta', 'lime', 'gray']
         self.build_graph(log_tf_graph)
-        self.plotting = None  #PlotRobot('rewards', 2)
 
     def build_graph(self, log_tf_graph):
         self.sess = tf.Session()
@@ -47,11 +54,10 @@ class GridWorldExperiment():
         self.policy = QLearningPolicy(self.n_states, self.n_actions-1,
                                       self.n_options, self.sess,
                                       state_hash=self.state_hash,
-                                      plotting=PlotRobot('dqn loss', 0,
-                                                         log_scale=True))
+                                      plotting=self.plot_robots[0])
         self.q_approx = LinearQApproximation(self.n_states, self.n_options,
                                              self.sess,
-                                             plotting=PlotRobot('q loss', 1))
+                                             plotting=self.plot_robots[1])
 
         if log_tf_graph:
             logdir = "/data/lisatmp2/sygnowsj/tflogs/gridworld"
@@ -92,15 +98,16 @@ class GridWorldExperiment():
             rewards = [math.log(q_omega) - math.log(p_omega)] * len(actions_hist)
             self.logger.debug("reward: %f", rewards[0])
             if self.plotting is not None:
-                self.plotting.add(rewards[0])
+                self.plotting.add(rewards[0], color=self.colors[omega],
+                                  averages=True)
             
 
-            if episode % 32 > 16:
+            if episode % 50 > 30:
                 # updating q-approx
                 self.logger.debug("adding to q-memory")
                 self.q_approx.add_to_memory(omega,
                                             self.state_hash(self.env.state))
-                if episode % 32 == 31:
+                if episode % 50 == 49:
                     self.logger.debug("regressing q")
                     self.q_approx.regress()
             else:
@@ -109,10 +116,13 @@ class GridWorldExperiment():
                 trajectories.append(Trajectory(
                     omega=omega, states=states_hist,
                     actions=actions_hist, rewards=rewards))
+                self.q_approx.add_to_memory(omega,
+                                            self.state_hash(self.env.state))
 
-                if episode % 32 == 16:
+                if episode % 50 == 30:
                     self.logger.debug("processing trajectories")
                     self.policy.update_policy(trajectories)
+                    trajectories = []
 
             # TODO: refactor
 
@@ -145,30 +155,37 @@ class GridWorldExperiment():
 
 if __name__ == "__main__":
     logger = logging.getLogger("mylogger")  # regular logging clashes with gym
-    hdlr = logging.FileHandler('gridworld.log')
-    hdlr.setFormatter(logging.Formatter('D: %(message)s'))
-    logger.addHandler(hdlr)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", dest="log", action="store_const",
                         const=True, default=False, help="turn on logging")
+    parser.add_argument("--plot", dest="plot", action="store_const",
+                        const=True, default=False,
+                        help="turn on realtime plotting")
+    parser.add_argument("--n_episodes", dest="n_episodes", action="store",
+                        default=2000, nargs='?', type=int,
+                        help="number of episodes")
     parser.add_argument('--no-roll', dest="no_roll", action="store_const",
                         const=True, default=False,
                         help="disable rollout after training")
     args = parser.parse_args()
     if args.log:
         logger.setLevel(logging.DEBUG)
+        hdlr = logging.FileHandler('gridworld.log')
+        hdlr.setFormatter(logging.Formatter('D: %(message)s'))
+        logger.addHandler(hdlr)
     else:
         logger.setLevel(logging.INFO)
 
-    experiment = GridWorldExperiment(logger=logger)
+    experiment = GridWorldExperiment(logger=logger, plotting=args.plot)
     logger.info("starting training")
 
-    experiment.train(n_episodes=2000)
+    experiment.train(n_episodes=args.n_episodes)
     logger.info("finished training, starting eval")
 
     if not args.no_roll:
-        samples = 10
+        samples = 20
+        full_reward_sum = 0.
         for omega in xrange(experiment.n_options):
             logger.info("omega %d", omega)
             reward_sum = 0.
@@ -182,5 +199,8 @@ if __name__ == "__main__":
                 reward_sum += math.log(q_omega) - math.log(p_omega)
 
             average_reward = reward_sum / samples
+            full_reward_sum += average_reward
             logger.info("omega %d average reward %f (log %f)", omega,
                         average_reward, math.exp(average_reward))
+
+        logger.info("reward: %f", full_reward_sum / experiment.n_options)

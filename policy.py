@@ -27,11 +27,12 @@ class QLearningPolicy(object):
 
     def build(self):
         W = tf.Variable(tf.truncated_normal(
-            [self.n_states, self.output_size], stddev=0.1))
+            [self.n_states, self.output_size], stddev=0.1))  # + 1
         b = tf.Variable([0.] * self.output_size)
 
         def get_q_value(state_placeholder):
-            state_enc = tf.one_hot(indices=state_placeholder, depth=self.n_states)
+            state_enc = tf.one_hot(indices=state_placeholder,
+                                   depth=self.n_states)  # + 1
             return tf.reshape(tf.matmul(state_enc, W) + b,
                               [-1, self.n_actions, self.n_options])
 
@@ -90,11 +91,8 @@ class QLearningPolicy(object):
         self.action = tf.argmax(output_perm[self.single_omega_place], axis=0)
 
     def process_transitions(self, transitions, plot=False):
-        p_s = [t[0] for t in transitions]
-        a = [t[1] - 1 for t in transitions]
-        r = [t[2] for t in transitions]
-        n_s = [t[3] for t in transitions]
-        omega = [t[4] for t in transitions]
+        p_s, a, r, n_s, omega = zip(*transitions)
+        a = [action - 1 for action in a]
 
         loss, _ = self.sess.run([self.full_loss, self.train_op], feed_dict=
                                 {self.state_place: p_s,
@@ -118,14 +116,17 @@ class QLearningPolicy(object):
             for (p_s, a, r, n_s) in zip(t.states, t.actions, t.rewards,
                                         t.states[1:]):
                 transitions.append((p_s, a, r, n_s, t.omega))
+            assert t.actions[-1] == 0
+#            transitions.append(
+#                (t.states[-1], 1, t.rewards[-1], self.n_states, t.omega))
 
-        for j in xrange(50):
+        for j in xrange(100):
             shuffle(transitions)
 
             for i in xrange(len(transitions)/self.batch_size):
                 self.process_transitions(
                     transitions[i*self.batch_size:(i+1)*self.batch_size],
-                    i == 0 and j == 0
+                    i == 0 and j % 10 == 0
                 )
 
 

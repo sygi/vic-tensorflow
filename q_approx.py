@@ -7,7 +7,7 @@ class LinearQApproximation:
         self.n_options = n_options
         self.sess = sess
         self.opt = opt
-        self.history_size = 100
+        self.history_size = 200
         self.experience_history = tf.Variable([[0, 0]] * self.history_size)
         # (option, state)
         self.replay_it = tf.Variable(0)
