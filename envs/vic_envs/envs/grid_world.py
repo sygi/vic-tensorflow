@@ -8,9 +8,10 @@ from gym.utils import seeding
 class GridWorld(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, board_size=(5, 9), wind_proba=0.2):
+    def __init__(self, board_size=(5, 9), wind_proba=0.2, stay_wind=True):
         self.board_size = board_size
         self.wind_proba = wind_proba
+        self.stay_wind = stay_wind
         self._seed()
 
         self._reset()
@@ -24,13 +25,16 @@ class GridWorld(gym.Env):
         return [seed]
 
     def _step(self, action):
-        if self.np_random.uniform(0., 1.) <= self.wind_proba:
-            direction = self.np_random.randint(4)
-
-            # move with the wind
-            self._move(direction)
-        else:
+        if ACTION_MEANING[action] == 'NOOP' and self.stay_wind == False:
             self._move(action)
+        else:
+            if self.np_random.uniform(0., 1.) <= self.wind_proba:
+                direction = self.np_random.randint(1, 6)
+
+                # move with the wind
+                self._move(direction)
+            else:
+                self._move(action)
 
         return self.state, 0, ACTION_MEANING[action] == "FINISH", {}
 
