@@ -7,7 +7,7 @@ class QLearningPolicy(object):
     def __init__(self, n_states, n_actions, n_options, sess, state_hash=id,
                  plotting=None, terminate_prob=0.05,
                  opt=tf.train.AdamOptimizer(0.001), discount=0.95,
-                 epsilon=0.0, batch_size=32):
+                 epsilon=0.01, batch_size=32):
 
         self.n_states = n_states
         self.n_actions = n_actions  # assume action no 0 is "finish"
@@ -21,7 +21,7 @@ class QLearningPolicy(object):
         self.opt = opt
         self.batch_size = batch_size
 
-        self.min_epsilon = 0.0
+        self.min_epsilon = 0.01
         self._epsilon = epsilon
         self.build()
 
@@ -44,40 +44,31 @@ class QLearningPolicy(object):
                                            name='action')
         output_prev = get_q_value(self.state_place)
 
-        print "output prev shape:", output_prev.get_shape()
         indices = tf.stack([tf.range(self.batch_size), self.action_place], 1)
-        print "indices shape", indices.get_shape()
 
         q_value = tf.gather_nd(output_prev, indices)
-        print "q value shape:", q_value.get_shape()
-        t_assert = tf.assert_equal(q_value.get_shape(),
-                                   [self.batch_size, self.n_options])
+        t_ass = tf.assert_equal(q_value.get_shape(),
+                                [self.batch_size, self.n_options])
 
         output_next = get_q_value(self.sf_place)
 
         next_state_val = tf.reduce_max(output_next, axis=1)
-        # [self.batch_size, self.n_options]
+        t_ass4 = tf.assert_equal(next_state_val.get_shape(),
+                                 [self.batch_size, self.n_options])
 
-        self.omega_place = tf.placeholder(tf.int32, shape=[self.batch_size],
-                                          name='omega')
-        self.reward_place = tf.placeholder(tf.float32, shape=[self.batch_size],
-                                           name='reward')
-        reward_exp = tf.expand_dims(self.reward_place, 1)
+        self.reward_place = tf.placeholder(
+            tf.float32, shape=[self.batch_size, self.n_options], name='rewards')
 
         loss = tf.square(
-            q_value - (reward_exp + self.discount * next_state_val))
+            q_value - (self.reward_place + self.discount * next_state_val))
 
         t_ass2 = tf.assert_equal(loss.get_shape(), [self.batch_size,
                                                  self.n_options])
 
-        indices2 = tf.stack([tf.range(self.batch_size), self.omega_place], 1)
+        self.loss_red = tf.reduce_mean(loss)
 
-        loss_omega = tf.gather_nd(loss, indices)
-        t_ass3 = tf.assert_equal(loss_omega.get_shape(), [self.batch_size])
-        self.full_loss = tf.reduce_mean(loss_omega)
-
-        with tf.control_dependencies([t_assert, t_ass2, t_ass3]):
-            self.train_op = self.opt.minimize(self.full_loss)
+        with tf.control_dependencies([t_ass, t_ass2, t_ass4]):
+            self.train_op = self.opt.minimize(self.loss_red)
 
         self.single_state_place = tf.placeholder(tf.int32, shape=(),
                                                  name='single_state')
@@ -88,46 +79,41 @@ class QLearningPolicy(object):
         output_single = get_q_value(tf.expand_dims(self.single_state_place, 0))
         output_perm = tf.transpose(output_single[0], perm=[1, 0])
 
-        self.action = tf.argmax(output_perm[self.single_omega_place], axis=0)
+        t_ass3 = tf.assert_equal(output_perm.get_shape(),
+                                 [self.n_options, self.n_actions])
+
+        with tf.control_dependencies([t_ass3]):
+            self.action = tf.argmax(output_perm[self.single_omega_place], axis=0)
 
     def process_transitions(self, transitions, plot=False):
-        p_s, a, r, n_s, omega = zip(*transitions)
+        p_s, a, r, n_s = zip(*transitions)
         a = [action - 1 for action in a]
 
-        loss, _ = self.sess.run([self.full_loss, self.train_op], feed_dict=
+        loss, _ = self.sess.run([self.loss_red, self.train_op], feed_dict=
                                 {self.state_place: p_s,
                                  self.sf_place: n_s,
                                  self.action_place: a,
-                                 self.reward_place: r,
-                                 self.omega_place: omega})
+                                 self.reward_place: r})
 
         if plot and self.plotting is not None:
             self.plotting.add(loss)
 
-    def process_trajectory(self, states, actions, rewards, omega):
-        assert all(isinstance(s, int) for s in states)
-
-        for (p_s, a, r, n_s) in zip(states, actions, rewards, states[1:]):
-            self.process_transition(p_s, a, r, n_s, omega)
-
     def update_policy(self, trajectories):
         transitions = []  # TODO: change to at least np.array
         for t in trajectories:
-            for (p_s, a, r, n_s) in zip(t.states, t.actions, t.rewards,
-                                        t.states[1:]):
-                transitions.append((p_s, a, r, n_s, t.omega))
-            assert t.actions[-1] == 0
+            for (p_s, a, n_s) in zip(t.states, t.actions, t.states[1:]):
+                transitions.append((p_s, a, t.rewards, n_s))
+
 #            transitions.append(
 #                (t.states[-1], 1, t.rewards[-1], self.n_states, t.omega))
 
-        for j in xrange(100):
+        for j in xrange(40):
             shuffle(transitions)
 
             for i in xrange(len(transitions)/self.batch_size):
                 self.process_transitions(
                     transitions[i*self.batch_size:(i+1)*self.batch_size],
-                    i == 0 and j % 10 == 0
-                )
+                    i == 0 and j%10 == 0)
 
 
 

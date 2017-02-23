@@ -5,6 +5,7 @@ import vic_envs
 import math
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import numpy as np
 
 import argparse
 import logging
@@ -28,7 +29,7 @@ class GridWorldExperiment():
         self.logger = logger
 
         self.n_options = n_options
-        self.env = gym.make("grid-world-simpler-v0")
+        self.env = gym.make("deterministic-grid-world-v0")
         self.n_actions = self.env.action_space.n
         self.n_states = 1 + reduce(lambda x,y: x*y,
              map(lambda x: x.n, self.env.observation_space.spaces))
@@ -83,48 +84,65 @@ class GridWorldExperiment():
             action = -1
             states_hist = []
             actions_hist = []
-            omega, p_omega = self.prior.sample_omega()
+            omega, _ = self.prior.sample_omega()
+            p_omegas = self.prior.all_p_omegas()
             self.logger.debug("omega: %d", omega)
             self.logger.debug("epsilon: %f", self.policy.epsilon)
             states_hist, actions_hist = self.rollout(omega)
 
             self.logger.debug("sf: %s", self.env.state)
 
-            q_omega = self.q_approx.q_value(omega,
-                                            self.state_hash(self.env.state))
-            self.logger.debug("q(omega|sf) = %f", q_omega)
-            self.logger.debug("p(omega|s0) = %f", p_omega)
+            q_omegas = self.q_approx.all_q_values(
+                self.state_hash(self.env.state))
 
-            rewards = [math.log(q_omega) - math.log(p_omega)] * len(actions_hist)
-            self.logger.debug("reward: %f", rewards[0])
+            self.logger.debug("q(omega|sf) = %s", q_omegas)
+            self.logger.debug("p(omega|s0) = %s", p_omegas)
+
+            assert len(p_omegas) == len(q_omegas)
+            rewards = map(lambda (p, q): math.log(q) - math.log(p),
+                          zip(p_omegas, q_omegas))
+
+            self.logger.debug("rewards: %s", rewards)
             if self.plotting is not None:
-                self.plotting.add(rewards[0], color=self.colors[omega],
+                self.plotting.add(rewards[omega], color=self.colors[omega],
                                   averages=True)
             
 
-            if episode % 50 > 30:
+            if episode % 32 > 16:
                 # updating q-approx
                 self.logger.debug("adding to q-memory")
                 self.q_approx.add_to_memory(omega,
                                             self.state_hash(self.env.state))
-                if episode % 50 == 49:
+                if episode % 32 == 31:
                     self.logger.debug("regressing q")
                     self.q_approx.regress()
             else:
                 # updating policy
                 self.logger.debug("saving trajectory")
-                trajectories.append(Trajectory(
-                    omega=omega, states=states_hist,
+                trajectories.append(Trajectory(states=states_hist,
                     actions=actions_hist, rewards=rewards))
                 self.q_approx.add_to_memory(omega,
                                             self.state_hash(self.env.state))
 
-                if episode % 50 == 30:
+                if episode % 32 == 16:
                     self.logger.debug("processing trajectories")
                     self.policy.update_policy(trajectories)
                     trajectories = []
-
             # TODO: refactor
+
+            if episode % 500 == 0:
+                self.logger.info("episode %d", episode)
+                q_app = np.zeros([self.n_states, self.n_options])
+                for s in xrange(self.n_states):
+                    q_app[s] = self.q_approx.all_q_values(s)
+                #    self.logger.info("state %d, q(omega): %s",
+                #                     s, q_app[s]))
+                self.logger.info("best final state for each option")
+                self.logger.info("%s", np.argmax(q_app, axis=0))
+                self.logger.info("with value:")
+                self.logger.info("%s", np.max(q_app, axis=0))
+
+
 
 
     def rollout(self, omega, render=False):

@@ -9,6 +9,9 @@ class FixedUniformDiscretePrior:
     def p_omega(self, omega):
         return 1./self.n_options
 
+    def all_p_omegas(self):
+        return [1./self.n_options] * self.n_options
+
     def sample_omega(self):
         """Returns an id of an option as a tensor of shape [1, 1]."""
         return self.sess.run(self.picker), 1./self.n_options

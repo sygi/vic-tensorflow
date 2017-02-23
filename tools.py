@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class Trajectory():
-    def __init__(self, omega, states, actions, rewards):
-        self.omega = omega
+    def __init__(self, states, actions, rewards):
         self.states = states
         self.actions = actions
         self.rewards = rewards

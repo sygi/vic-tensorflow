@@ -91,7 +91,7 @@ class LinearQApproximation:
         self.sess.run(self.inc_replay_it, feed_dict=feed_dict)
 
     def regress(self):
-        for i in xrange(100):
+        for i in xrange(200):
             loss, _  = self.sess.run([self.loss, self.train_op])
             if i == 0 and self.plotting is not None:
                 self.plotting.add(loss)
@@ -103,3 +103,9 @@ class LinearQApproximation:
                                 feed_dict=feed_dict)
 
         return q_omega
+
+    def all_q_values(self, sf, s0=None):
+        return self.sess.run(self.normalized_output[0], feed_dict={
+            self.sf_place: sf})
+
+    # TODO: feeder decorator
