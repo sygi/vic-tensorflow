@@ -6,8 +6,8 @@ from random import shuffle
 class QLearningPolicy(object):
     def __init__(self, n_states, n_actions, n_options, sess, state_hash=id,
                  plotting=None, terminate_prob=0.05,
-                 opt=tf.train.AdamOptimizer(0.001), discount=0.95,
-                 epsilon=0.01, batch_size=32):
+                 opt=tf.train.AdamOptimizer(0.0001), discount=0.95,
+                 epsilon=0.05, batch_size=32):
 
         self.n_states = n_states
         self.n_actions = n_actions  # assume action no 0 is "finish"
@@ -20,8 +20,9 @@ class QLearningPolicy(object):
         self.discount = discount
         self.opt = opt
         self.batch_size = batch_size
+        self.action_it = 0
 
-        self.min_epsilon = 0.01
+        self.min_epsilon = 0.05
         self._epsilon = epsilon
         self.build()
 
@@ -107,7 +108,7 @@ class QLearningPolicy(object):
 #            transitions.append(
 #                (t.states[-1], 1, t.rewards[-1], self.n_states, t.omega))
 
-        for j in xrange(40):
+        for j in xrange(200):
             shuffle(transitions)
 
             for i in xrange(len(transitions)/self.batch_size):
@@ -116,11 +117,16 @@ class QLearningPolicy(object):
                     i == 0 and j%10 == 0)
 
 
+    def reset_action_it(self):
+        self.action_it = 0
 
     def get_action(self, state, omega):
         assert isinstance(state, int)
-        if np.random.uniform() < self.terminate_prob:
+        if self.action_it > 5 and np.random.uniform() < self.terminate_prob:
+            self.reset_action_it()
             return 0  # terminate
+
+        self.action_it += 1
         
         if np.random.uniform() < self.epsilon:
             return 1 + np.random.randint(self.n_actions)

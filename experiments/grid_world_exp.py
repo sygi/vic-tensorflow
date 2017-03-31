@@ -108,29 +108,26 @@ class GridWorldExperiment():
                                   averages=True)
             
 
-            if episode % 32 > 16:
-                # updating q-approx
-                self.logger.debug("adding to q-memory")
-                self.q_approx.add_to_memory(omega,
-                                            self.state_hash(self.env.state))
-                if episode % 32 == 31:
-                    self.logger.debug("regressing q")
-                    self.q_approx.regress()
-            else:
-                # updating policy
-                self.logger.debug("saving trajectory")
-                trajectories.append(Trajectory(states=states_hist,
-                    actions=actions_hist, rewards=rewards))
-                self.q_approx.add_to_memory(omega,
-                                            self.state_hash(self.env.state))
+            # collecting trajectories
+            self.logger.debug("saving trajectory")
+            trajectories.append(Trajectory(states=states_hist,
+                actions=actions_hist, rewards=rewards))
+            self.q_approx.add_to_memory(omega,
+                                        self.state_hash(self.env.state))
+            if episode % 64 == 63:
+                self.logger.debug("regressing q")
+                self.q_approx.regress()
 
-                if episode % 32 == 16:
-                    self.logger.debug("processing trajectories")
-                    self.policy.update_policy(trajectories)
-                    trajectories = []
+                for t in trajectories:
+                    p_omegas = self.prior.all_p_omegas()
+                    q_omegas = self.q_approx.all_q_values(t.states[-1])
+                    t.rewards = map(lambda (p, q): math.log(q) - math.log(p),
+                                    zip(p_omegas, q_omegas))
+                self.policy.update_policy(trajectories)
+                trajectories = []
             # TODO: refactor
 
-            if episode % 500 == 0:
+            if episode % 400 == 399:
                 self.logger.info("episode %d", episode)
                 q_app = np.zeros([self.n_states, self.n_options])
                 for s in xrange(self.n_states):
@@ -142,7 +139,10 @@ class GridWorldExperiment():
                 self.logger.info("with value:")
                 self.logger.info("%s", np.max(q_app, axis=0))
 
-
+                self.logger.info("most probable option for each state:")
+                self.logger.info("%s", np.argmax(q_app, axis=1))
+                self.logger.info("with value:")
+                self.logger.info("%s", np.max(q_app, axis=1))
 
 
     def rollout(self, omega, render=False):

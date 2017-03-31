@@ -7,7 +7,7 @@ class LinearQApproximation:
         self.n_options = n_options
         self.sess = sess
         self.opt = opt
-        self.history_size = 200
+        self.history_size = 100
         self.experience_history = tf.Variable([[0, 0]] * self.history_size)
         # (option, state)
         self.replay_it = tf.Variable(0)
@@ -16,7 +16,7 @@ class LinearQApproximation:
 
         self.plotting = plotting
 
-        self.batch_size = 32
+        self.batch_size = 64
         
         self.build(use_s0)
         
@@ -91,7 +91,7 @@ class LinearQApproximation:
         self.sess.run(self.inc_replay_it, feed_dict=feed_dict)
 
     def regress(self):
-        for i in xrange(200):
+        for i in xrange(500):
             loss, _  = self.sess.run([self.loss, self.train_op])
             if i == 0 and self.plotting is not None:
                 self.plotting.add(loss)
