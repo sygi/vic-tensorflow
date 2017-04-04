@@ -6,8 +6,8 @@ from random import shuffle
 class QLearningPolicy(object):
     def __init__(self, n_states, n_actions, n_options, sess, state_hash=id,
                  plotting=None, terminate_prob=0.05,
-                 opt=tf.train.AdamOptimizer(0.0001), discount=0.95,
-                 epsilon=0.05, batch_size=32):
+                 opt=tf.train.AdamOptimizer(0.0001), discount=0.99,
+                 epsilon=0.20, batch_size=32):
 
         self.n_states = n_states
         self.n_actions = n_actions  # assume action no 0 is "finish"
@@ -22,13 +22,13 @@ class QLearningPolicy(object):
         self.batch_size = batch_size
         self.action_it = 0
 
-        self.min_epsilon = 0.05
+        self.min_epsilon = 0.001  # change from 0.001 here
         self._epsilon = epsilon
         self.build()
 
     def build(self):
         W = tf.Variable(tf.truncated_normal(
-            [self.n_states, self.output_size], stddev=0.1))  # + 1
+            [self.n_states, self.output_size], stddev=1.))  # + 1
         b = tf.Variable([0.] * self.output_size)
 
         def get_q_value(state_placeholder):
@@ -64,7 +64,7 @@ class QLearningPolicy(object):
             q_value - (self.reward_place + self.discount * next_state_val))
 
         t_ass2 = tf.assert_equal(loss.get_shape(), [self.batch_size,
-                                                 self.n_options])
+                                                    self.n_options])
 
         self.loss_red = tf.reduce_mean(loss)
 
@@ -90,11 +90,11 @@ class QLearningPolicy(object):
         p_s, a, r, n_s = zip(*transitions)
         a = [action - 1 for action in a]
 
-        loss, _ = self.sess.run([self.loss_red, self.train_op], feed_dict=
-                                {self.state_place: p_s,
-                                 self.sf_place: n_s,
-                                 self.action_place: a,
-                                 self.reward_place: r})
+        loss, _ = self.sess.run([self.loss_red, self.train_op],
+                                feed_dict={self.state_place: p_s,
+                                           self.sf_place: n_s,
+                                           self.action_place: a,
+                                           self.reward_place: r})
 
         if plot and self.plotting is not None:
             self.plotting.add(loss)
@@ -108,14 +108,13 @@ class QLearningPolicy(object):
 #            transitions.append(
 #                (t.states[-1], 1, t.rewards[-1], self.n_states, t.omega))
 
-        for j in xrange(200):
+        for j in xrange(10):
             shuffle(transitions)
 
             for i in xrange(len(transitions)/self.batch_size):
                 self.process_transitions(
                     transitions[i*self.batch_size:(i+1)*self.batch_size],
-                    i == 0 and j%10 == 0)
-
+                    i == 0 and j % 10 == 0)
 
     def reset_action_it(self):
         self.action_it = 0
@@ -127,7 +126,7 @@ class QLearningPolicy(object):
             return 0  # terminate
 
         self.action_it += 1
-        
+
         if np.random.uniform() < self.epsilon:
             return 1 + np.random.randint(self.n_actions)
 
@@ -142,7 +141,7 @@ class QLearningPolicy(object):
 
     def set_omega(self, omega):
         self.omega = omega
-    
+
     @property
     def epsilon(self):
         return self._epsilon

@@ -1,6 +1,5 @@
 from __future__ import print_function
 import matplotlib.pyplot as plt
-import numpy as np
 
 class Trajectory():
     def __init__(self, states, actions, rewards):
@@ -24,8 +23,8 @@ class PlotRobot():
             plt.yscale('log')
         plt.scatter(self.it, point, marker=marker, color=color)
 
-        plt.xlim(0, self.it - self.it%100 + 100)
-        if averages and self.it%200 == 0:
+        plt.xlim(0, self.it - self.it % 100 + 100)
+        if averages and self.it % 200 == 0:
             ave = sum(self.points[-200:])/len(self.points[-200:])
             plt.plot([self.it - 200, self.it], [ave, ave], color='black')
 

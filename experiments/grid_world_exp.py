@@ -10,7 +10,6 @@ import numpy as np
 import argparse
 import logging
 import os.path
-import shutil
 import time
 
 from policy import QLearningPolicy
@@ -31,7 +30,7 @@ class GridWorldExperiment():
         self.n_options = n_options
         self.env = gym.make("deterministic-grid-world-v0")
         self.n_actions = self.env.action_space.n
-        self.n_states = 1 + reduce(lambda x,y: x*y,
+        self.n_states = 1 + reduce(lambda x, y: x*y,
              map(lambda x: x.n, self.env.observation_space.spaces))
 
         if plotting:
@@ -65,9 +64,9 @@ class GridWorldExperiment():
             exp_id = 1
             while os.path.exists(logdir + str(exp_id)):
                 exp_id += 1
-            summary_op = tf.summary.FileWriter(logdir + str(exp_id),
-                                               self.sess.graph)
-        
+            tf.summary.FileWriter(logdir + str(exp_id),
+                                  self.sess.graph)
+
         self.sess.run(tf.global_variables_initializer())
 
     def train(self, n_episodes=1000):
@@ -79,9 +78,11 @@ class GridWorldExperiment():
             else:
                 self.logger.debug("episode %d", episode)
                 self.logger.debug("==========")
-            #self.policy.epsilon = 1.0 - (float(episode) / float(n_episodes))
 
-            action = -1
+            no_epsilon_episodes = 100
+            percentage = min(1., float(episode) / float(n_episodes - no_epsilon_episodes))
+            self.policy.epsilon = 0.1 * (1.0 - percentage)
+
             states_hist = []
             actions_hist = []
             omega, _ = self.prior.sample_omega()
@@ -106,7 +107,6 @@ class GridWorldExperiment():
             if self.plotting is not None:
                 self.plotting.add(rewards[omega], color=self.colors[omega],
                                   averages=True)
-            
 
             # collecting trajectories
             self.logger.debug("saving trajectory")
@@ -114,7 +114,7 @@ class GridWorldExperiment():
                 actions=actions_hist, rewards=rewards))
             self.q_approx.add_to_memory(omega,
                                         self.state_hash(self.env.state))
-            if episode % 64 == 63:
+            if episode % 32 == 31:
                 self.logger.debug("regressing q")
                 self.q_approx.regress()
 
@@ -154,14 +154,14 @@ class GridWorldExperiment():
             if render:
                 self.env._render()
                 time.sleep(0.01)
-            self.logger.debug("state: %s, state_hash: %d", self.env.state,
-                              self.state_hash(self.env.state))
+            # self.logger.debug("state: %s, state_hash: %d", self.env.state,
+            #                   self.state_hash(self.env.state))
             states_hist.append(self.state_hash(self.env.state))
             # TODO: use state from the env.step
 
             action = self.policy.get_action(self.state_hash(self.env.state),
                                             omega)
-            self.logger.debug("action: %d", action)
+            # self.logger.debug("action: %d", action)
             self.env.step(action)
             actions_hist.append(action)
 
